@@ -29,11 +29,16 @@
     }
     .btn-group {
       display: flex;
-      flex-wrap: wrap;
       gap: 6px;
     }
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1 1 50%;
+    }
     button {
-      flex: 1 1 45%;
+      width: 100%;
       padding: 8px;
       font-size: 14px;
       border-radius: 6px;
@@ -186,25 +191,34 @@
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
-        btnGroup.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
+        // Kolom kiri
+        const colLeft = document.createElement("div");
+        colLeft.className = "col";
+        colLeft.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
           catatJam(nama, STATUS.PAGI_MASUK)
         ));
-        btnGroup.appendChild(makeButton("Siang Pulang", "siang-pulang", () =>
+        colLeft.appendChild(makeButton("Siang Pulang", "siang-pulang", () =>
           catatJam(nama, STATUS.SIANG_PULANG)
         ));
-        btnGroup.appendChild(makeButton("Siang Masuk", "siang-masuk", () =>
-          catatJam(nama, STATUS.SIANG_MASUK)
-        ));
-        btnGroup.appendChild(makeButton("Sore Pulang", "sore-pulang", () =>
-          catatJam(nama, STATUS.SORE_PULANG)
-        ));
-
-        btnGroup.appendChild(makeButton("Absent Pagi", "absent", () =>
+        colLeft.appendChild(makeButton("Absent Pagi", "absent", () =>
           setAbsent(nama, "pagi")
         ));
-        btnGroup.appendChild(makeButton("Absent Siang", "absent", () =>
+
+        // Kolom kanan
+        const colRight = document.createElement("div");
+        colRight.className = "col";
+        colRight.appendChild(makeButton("Siang Masuk", "siang-masuk", () =>
+          catatJam(nama, STATUS.SIANG_MASUK)
+        ));
+        colRight.appendChild(makeButton("Sore Pulang", "sore-pulang", () =>
+          catatJam(nama, STATUS.SORE_PULANG)
+        ));
+        colRight.appendChild(makeButton("Absent Siang", "absent", () =>
           setAbsent(nama, "siang")
         ));
+
+        btnGroup.appendChild(colLeft);
+        btnGroup.appendChild(colRight);
 
         card.appendChild(title);
         card.appendChild(btnGroup);
@@ -375,7 +389,7 @@
         });
       });
 
-      // URUTKAN: Nama dulu, baru Tanggal
+      // Urut: Nama dulu, lalu tanggal naik
       const keys = Object.keys(perHariPerNama).sort((a, b) => {
         const [tglA, namaA] = a.split("|");
         const [tglB, namaB] = b.split("|");
