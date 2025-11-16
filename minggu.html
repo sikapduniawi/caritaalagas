@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Absensi Toko</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    }
+    .nama {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    button {
+      flex: 1 1 45%;
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+    }
+    .pagi-masuk   { background: #2196f3; }
+    .siang-pulang { background: #ff9800; }
+    .siang-masuk  { background: #4caf50; }
+    .sore-pulang  { background: #9c27b0; }
+
+    .footer {
+      margin-top: 16px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .footer button {
+      flex: 0 0 auto;
+      margin: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #444;
+    }
+    .info-tanggal {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .log-preview {
+      white-space: pre-wrap;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #222;
+      color: #eee;
+      padding: 8px;
+      border-radius: 6px;
+      margin-top: 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>Absensi Pegawai Toko</h1>
+  <div class="info-tanggal" id="infoTanggal"></div>
+
+  <!-- Daftar pegawai -->
+  <div id="listPegawai"></div>
+
+  <!-- Bagian bawah: tombol utilitas -->
+  <div class="card footer">
+    <div>
+      <button onclick="clearHariIni()">Hapus data hari ini</button>
+      <button onclick="clearSemua()">Hapus semua data</button>
+      <button onclick="downloadTxt()">Download TXT</button>
+    </div>
+    <div style="margin-top:6px;">Preview data tersimpan:</div>
+    <div id="logPreview" class="log-preview"></div>
+  </div>
+
+  <script>
+    // --- Konfigurasi nama pegawai dan jenis status ---
+    const PEGAWAI = [
+      "Bu Wita",
+      "Bu Sur",
+      "Bu Susi",
+      "Dea",
+      "Nurul",
+      "Bg Ari"
+    ];
+
+    // Status sesuai permintaan
+    const STATUS = {
+      PAGI_MASUK:   "Pagi-Masuk",
+      SIANG_PULANG: "Siang-Pulang",
+      SIANG_MASUK:  "Siang-Masuk",
+      SORE_PULANG:  "Sore-Pulang"
+    };
+
+    // Key untuk localStorage
+    const STORAGE_KEY = "absensi_toko";
+
+    // --- Util: format tanggal & waktu ---
+    function pad(n) { return n.toString().padStart(2, "0"); }
+
+    function getNow() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = pad(d.getMonth() + 1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const min = pad(d.getMinutes());
+      const ss = pad(d.getSeconds());
+      return {
+        dateKey: `${yyyy}-${mm}-${dd}`,         // untuk penyimpanan
+        dateLabel: `${dd}-${mm}-${yyyy}`,       // untuk tampilan
+        time: `${hh}:${min}:${ss}`
+      };
+    }
+
+    // --- LocalStorage helper ---
+    function loadData() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error("Data rusak, reset", e);
+        return {};
+      }
+    }
+
+    function saveData(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    // --- Render daftar pegawai dan tombol ---
+    function renderPegawai() {
+      const container = document.getElementById("listPegawai");
+      container.innerHTML = "";
+
+      PEGAWAI.forEach(nama => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const title = document.createElement("div");
+        title.className = "nama";
+        title.textContent = nama;
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        // Buat 4 tombol
+        btnGroup.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
+          catat(nama, STATUS.PAGI_MASUK)
+        ));
+        btnGroup.appendChild(makeButton("Siang Pulang", "siang-pulang", () =>
+          catat(nama, STATUS.SIANG_PULANG)
+        ));
+        btnGroup.appendChild(makeButton("Siang Masuk", "siang-masuk", () =>
+          catat(nama, STATUS.SIANG_MASUK)
+        ));
+        btnGroup.appendChild(makeButton("Sore Pulang", "sore-pulang", () =>
+          catat(nama, STATUS.SORE_PULANG)
+        ));
+
+        card.appendChild(title);
+        card.appendChild(btnGroup);
+        container.appendChild(card);
+      });
+    }
+
+    function makeButton(label, cssClass, onClick) {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.classList.add(cssClass);
+      btn.onclick = onClick;
+      return btn;
+    }
+
+    // --- Fungsi utama: mencatat absensi ---
+    function catat(namaPegawai, status) {
+      const now = getNow();
+      const data = loadData();
+
+      if (!data[now.dateKey]) {
+        data[now.dateKey] = [];
+      }
+
+      // Simpan record
+      data[now.dateKey].push({
+        nama: namaPegawai,
+        status: status,
+        tanggal: now.dateKey,
+        jam: now.time
+      });
+
+      saveData(data);
+      alert(`Terekam: ${namaPegawai} - ${status} - ${now.time}`);
+      renderPreview();
+    }
+
+    // --- Hapus data hari ini ---
+    function clearHariIni() {
+      if (!confirm("Hapus semua data absensi hari ini?")) return;
+      const now = getNow();
+      const data = loadData();
+      if (data[now.dateKey]) {
+        delete data[now.dateKey];
+        saveData(data);
+      }
+      renderPreview();
+    }
+
+    // --- Hapus semua data ---
+    function clearSemua() {
+      if (!confirm("Hapus SEMUA data absensi?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderPreview();
+    }
+
+    // --- Download ke file TXT (bisa dibuka Notepad) ---
+    function downloadTxt() {
+      const data = loadData();
+      let lines = [];
+      lines.push("ABSENSI PEGAWAI TOKO");
+      lines.push("====================");
+      lines.push("");
+
+      // Loop per tanggal
+      Object.keys(data).sort().forEach(tgl => {
+        lines.push(`Tanggal: ${tgl}`);
+        data[tgl].forEach(rec => {
+          lines.push(`  - ${rec.nama} | ${rec.status} | ${rec.jam}`);
+        });
+        lines.push("");
+      });
+
+      const content = lines.join("\n");
+      const blob = new Blob([content], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      const now = getNow();
+      a.download = `absensi_${now.dateKey}.txt`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // --- Preview data untuk cek cepat ---
+    function renderPreview() {
+      const box = document.getElementById("logPreview");
+      const data = loadData();
+      let text = "";
+
+      const dates = Object.keys(data).sort();
+      if (dates.length === 0) {
+        box.textContent = "Belum ada data.";
+        return;
+      }
+
+      dates.forEach(tgl => {
+        text += `Tanggal: ${tgl}\n`;
+        data[tgl].forEach(rec => {
+          text += `  - ${rec.nama} | ${rec.status} | ${rec.jam}\n`;
+        });
+        text += "\n";
+      });
+
+      box.textContent = text;
+    }
+
+    // --- Inisialisasi saat halaman dibuka ---
+    function initTanggal() {
+      const info = document.getElementById("infoTanggal");
+      const now = getNow();
+      info.textContent = `Hari ini: ${now.dateLabel}`;
+    }
+
+    initTanggal();
+    renderPegawai();
+    renderPreview();
+  </script>
+</body>
+</html>
