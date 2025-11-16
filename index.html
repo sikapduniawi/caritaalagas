@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Absensi Toko</title>
+  <title>Absensi Pegawai Toko</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -84,11 +84,9 @@
   <!-- Daftar pegawai -->
   <div id="listPegawai"></div>
 
-  <!-- Bagian bawah: tombol utilitas -->
+  <!-- Bagian bawah: hanya Download TXT + preview -->
   <div class="card footer">
     <div>
-      <button onclick="clearHariIni()">Hapus data hari ini</button>
-      <button onclick="clearSemua()">Hapus semua data</button>
       <button onclick="downloadTxt()">Download TXT</button>
     </div>
     <div style="margin-top:6px;">Preview data tersimpan:</div>
@@ -106,7 +104,6 @@
       "Bg Ari"
     ];
 
-    // Status sesuai permintaan
     const STATUS = {
       PAGI_MASUK:   "Pagi-Masuk",
       SIANG_PULANG: "Siang-Pulang",
@@ -129,8 +126,8 @@
       const min = pad(d.getMinutes());
       const ss = pad(d.getSeconds());
       return {
-        dateKey: `${yyyy}-${mm}-${dd}`,         // untuk penyimpanan
-        dateLabel: `${dd}-${mm}-${yyyy}`,       // untuk tampilan
+        dateKey: `${yyyy}-${mm}-${dd}`,   // untuk penyimpanan
+        dateLabel: `${dd}-${mm}-${yyyy}`, // untuk tampilan
         time: `${hh}:${min}:${ss}`
       };
     }
@@ -167,7 +164,6 @@
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
-        // Buat 4 tombol
         btnGroup.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
           catat(nama, STATUS.PAGI_MASUK)
         ));
@@ -204,7 +200,6 @@
         data[now.dateKey] = [];
       }
 
-      // Simpan record
       data[now.dateKey].push({
         nama: namaPegawai,
         status: status,
@@ -217,25 +212,6 @@
       renderPreview();
     }
 
-    // --- Hapus data hari ini ---
-    function clearHariIni() {
-      if (!confirm("Hapus semua data absensi hari ini?")) return;
-      const now = getNow();
-      const data = loadData();
-      if (data[now.dateKey]) {
-        delete data[now.dateKey];
-        saveData(data);
-      }
-      renderPreview();
-    }
-
-    // --- Hapus semua data ---
-    function clearSemua() {
-      if (!confirm("Hapus SEMUA data absensi?")) return;
-      localStorage.removeItem(STORAGE_KEY);
-      renderPreview();
-    }
-
     // --- Download ke file TXT (bisa dibuka Notepad) ---
     function downloadTxt() {
       const data = loadData();
@@ -244,7 +220,6 @@
       lines.push("====================");
       lines.push("");
 
-      // Loop per tanggal
       Object.keys(data).sort().forEach(tgl => {
         lines.push(`Tanggal: ${tgl}`);
         data[tgl].forEach(rec => {
