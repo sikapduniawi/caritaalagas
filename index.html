@@ -92,7 +92,6 @@
   <div class="card footer">
     <div>
       <button onclick="downloadCsv()">Download Excel (CSV)</button>
-      <button onclick="clearAllData()">Clear All Log</button>
     </div>
     <div style="margin-top:6px;">Preview data tersimpan:</div>
     <div id="logPreview" class="log-preview"></div>
@@ -336,16 +335,6 @@
       });
     }
 
-    // --- CLEAR ALL DATA (HAPUS LOG + RESET PREVIEW & TOMBOL) ---
-    function clearAllData() {
-      if (!confirm("Yakin ingin menghapus semua data absensi di perangkat ini?")) {
-        return;
-      }
-      localStorage.removeItem(STORAGE_KEY);
-      renderPreview();             // Preview jadi "Belum ada data."
-      updateAllButtonsDisabledState(); // Semua tombol aktif lagi
-    }
-
     // --- EXPORT CSV DENGAN OVERTIME & ABSEN, URUT NAMA → TANGGAL ---
     function downloadCsv() {
       const data = loadData();
@@ -386,6 +375,7 @@
         });
       });
 
+      // URUTKAN: Nama dulu, baru Tanggal
       const keys = Object.keys(perHariPerNama).sort((a, b) => {
         const [tglA, namaA] = a.split("|");
         const [tglB, namaB] = b.split("|");
