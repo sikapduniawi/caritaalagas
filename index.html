@@ -84,10 +84,10 @@
   <!-- Daftar pegawai -->
   <div id="listPegawai"></div>
 
-  <!-- Bagian bawah: hanya Download TXT + preview -->
+  <!-- Bagian bawah: Download CSV + preview -->
   <div class="card footer">
     <div>
-      <button onclick="downloadTxt()">Download TXT</button>
+      <button onclick="downloadCsv()">Download Excel (CSV)</button>
     </div>
     <div style="margin-top:6px;">Preview data tersimpan:</div>
     <div id="logPreview" class="log-preview"></div>
@@ -111,10 +111,8 @@
       SORE_PULANG:  "Sore-Pulang"
     };
 
-    // Key untuk localStorage
     const STORAGE_KEY = "absensi_toko";
 
-    // --- Util: format tanggal & waktu ---
     function pad(n) { return n.toString().padStart(2, "0"); }
 
     function getNow() {
@@ -125,10 +123,15 @@
       const hh = pad(d.getHours());
       const min = pad(d.getMinutes());
       const ss = pad(d.getSeconds());
+
+      const hariIndex = d.getDay(); // 0=Min,1=Sen,...
+      const namaHari = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"][hariIndex];
+
       return {
-        dateKey: `${yyyy}-${mm}-${dd}`,   // untuk penyimpanan
-        dateLabel: `${dd}-${mm}-${yyyy}`, // untuk tampilan
-        time: `${hh}:${min}:${ss}`
+        dateKey: `${yyyy}-${mm}-${dd}`,        // untuk penyimpanan
+        dateLabel: `${dd}-${mm}-${yyyy}`,      // tampilan
+        time: `${hh}:${min}:${ss}`,
+        dayName: namaHari
       };
     }
 
@@ -191,7 +194,7 @@
       return btn;
     }
 
-    // --- Fungsi utama: mencatat absensi ---
+    // --- Catat absensi (menyimpan juga nama hari) ---
     function catat(namaPegawai, status) {
       const now = getNow();
       const data = loadData();
@@ -204,6 +207,7 @@
         nama: namaPegawai,
         status: status,
         tanggal: now.dateKey,
+        hari: now.dayName,
         jam: now.time
       });
 
@@ -212,33 +216,93 @@
       renderPreview();
     }
 
-    // --- Download ke file TXT (bisa dibuka Notepad) ---
-    function downloadTxt() {
+    // --- Bentuk CSV: Nama | Hari | Tanggal | 4 kolom status ---
+    function downloadCsv() {
       const data = loadData();
-      let lines = [];
-      lines.push("ABSENSI PEGAWAI TOKO");
-      lines.push("====================");
-      lines.push("");
+      const dates = Object.keys(data).sort();
+      if (dates.length === 0) {
+        alert("Belum ada data untuk di-download.");
+        return;
+      }
 
-      Object.keys(data).sort().forEach(tgl => {
-        lines.push(`Tanggal: ${tgl}`);
+      // Map: key = tanggal + '|' + nama  -> objek ringkasan per hari
+      const perHariPerNama = {};
+
+      dates.forEach(tgl => {
         data[tgl].forEach(rec => {
-          lines.push(`  - ${rec.nama} | ${rec.status} | ${rec.jam}`);
+          const key = `${rec.tanggal}|${rec.nama}`;
+          if (!perHariPerNama[key]) {
+            perHariPerNama[key] = {
+              tanggal: rec.tanggal,
+              hari: rec.hari || "", // kalau data lama belum ada hari
+              nama: rec.nama,
+              "Pagi-Masuk": "",
+              "Siang-Pulang": "",
+              "Siang-Masuk": "",
+              "Sore-Pulang": ""
+            };
+          }
+          // hanya simpan timestamp pertama untuk tiap status
+          if (!perHariPerNama[key][rec.status]) {
+            perHariPerNama[key][rec.status] = rec.jam;
+          }
         });
-        lines.push("");
       });
 
-      const content = lines.join("\n");
-      const blob = new Blob([content], { type: "text/plain" });
+      // Urutkan berdasarkan tanggal lalu nama
+      const keys = Object.keys(perHariPerNama).sort((a, b) => {
+        const [tglA, namaA] = a.split("|");
+        const [tglB, namaB] = b.split("|");
+        if (tglA === tglB) return namaA.localeCompare(namaB);
+        return tglA.localeCompare(tglB);
+      });
+
+      // Header CSV
+      const rows = [];
+      rows.push(["Nama", "Hari", "Tanggal", "Pagi-Masuk", "Siang-Pulang", "Siang-Masuk", "Sore-Pulang"]);
+
+      // Isi baris
+      keys.forEach(k => {
+        const r = perHariPerNama[k];
+        rows.push([
+          r.nama,
+          r.hari,
+          // ubah format tanggal ke dd/mm/yyyy agar enak di Excel
+          formatTanggalIndo(r.tanggal),
+          r["Pagi-Masuk"],
+          r["Siang-Pulang"],
+          r["Siang-Masuk"],
+          r["Sore-Pulang"]
+        ]);
+      });
+
+      const csv = rows
+        .map(row =>
+          row
+            .map(col => {
+              const v = String(col ?? "").replace(/"/g, '""');
+              return `"${v}"`;
+            })
+            .join(",")
+        )
+        .join("\n");
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
       const now = getNow();
-      a.download = `absensi_${now.dateKey}.txt`;
+      a.href = URL.createObjectURL(blob);
+      a.download = `absensi_${now.dateKey}.csv`;
       a.click();
       URL.revokeObjectURL(a.href);
     }
 
-    // --- Preview data untuk cek cepat ---
+    function formatTanggalIndo(tanggalYMD) {
+      // "2025-11-16" -> "16/11/2025"
+      const [y, m, d] = tanggalYMD.split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    // --- Preview data mentah seperti sebelumnya ---
     function renderPreview() {
       const box = document.getElementById("logPreview");
       const data = loadData();
@@ -253,7 +317,8 @@
       dates.forEach(tgl => {
         text += `Tanggal: ${tgl}\n`;
         data[tgl].forEach(rec => {
-          text += `  - ${rec.nama} | ${rec.status} | ${rec.jam}\n`;
+          const hari = rec.hari ? ` (${rec.hari})` : "";
+          text += `  - ${rec.nama}${hari} | ${rec.status} | ${rec.jam}\n`;
         });
         text += "\n";
       });
@@ -261,11 +326,10 @@
       box.textContent = text;
     }
 
-    // --- Inisialisasi saat halaman dibuka ---
     function initTanggal() {
       const info = document.getElementById("infoTanggal");
       const now = getNow();
-      info.textContent = `Hari ini: ${now.dateLabel}`;
+      info.textContent = `Hari ini: ${now.dayName}, ${now.dateLabel}`;
     }
 
     initTanggal();
