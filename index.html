@@ -35,7 +35,7 @@
       display: flex;
       flex-direction: column;
       gap: 6px;
-      flex: 1 1 50%;
+      flex: 1 1 33%;
     }
     button {
       width: 100%;
@@ -46,10 +46,12 @@
       color: #fff;
       cursor: pointer;
     }
-    .pagi-masuk   { background: #2196f3; }
-    .siang-pulang { background: #ff9800; }
-    .siang-masuk  { background: #4caf50; }
-    .sore-pulang  { background: #9c27b0; }
+    .masuk-pagi   { background: #2196f3; }
+    .pulang-siang { background: #ff9800; }
+    .masuk-siang  { background: #4caf50; }
+    .pulang-sore  { background: #9c27b0; }
+    .masuk-sore   { background: #3f51b5; }
+    .pulang-malam { background: #00bcd4; } /* warna cerah baru */
     .absent       { background: #e53935; }
 
     button.disabled-btn {
@@ -114,12 +116,15 @@
     ];
 
     const STATUS = {
-      PAGI_MASUK:   "Pagi-Masuk",
-      SIANG_PULANG: "Siang-Pulang",
-      SIANG_MASUK:  "Siang-Masuk",
-      SORE_PULANG:  "Sore-Pulang",
+      MASUK_PAGI:   "Masuk-Pagi",
+      PULANG_SIANG: "Pulang-Siang",
+      MASUK_SIANG:  "Masuk-Siang",
+      PULANG_SORE:  "Pulang-Sore",
+      MASUK_SORE:   "Masuk-Sore",
+      PULANG_MALAM: "Pulang-Malam",
       ABSEN_PAGI:   "Absent-Pagi",
-      ABSEN_SIANG:  "Absent-Siang"
+      ABSEN_SIANG:  "Absent-Siang",
+      ABSEN_SORE:   "Absent-Sore"
     };
 
     const STORAGE_KEY = "absensi_toko";
@@ -191,34 +196,48 @@
         const btnGroup = document.createElement("div");
         btnGroup.className = "btn-group";
 
-        // Kolom kiri
-        const colLeft = document.createElement("div");
-        colLeft.className = "col";
-        colLeft.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
-          catatJam(nama, STATUS.PAGI_MASUK)
+        // Kolom 1: Masuk-Pagi, Pulang-Siang, Absent Pagi
+        const col1 = document.createElement("div");
+        col1.className = "col";
+        col1.appendChild(makeButton("Masuk - Pagi", "masuk-pagi", () =>
+          catatJam(nama, STATUS.MASUK_PAGI)
         ));
-        colLeft.appendChild(makeButton("Siang Pulang", "siang-pulang", () =>
-          catatJam(nama, STATUS.SIANG_PULANG)
+        col1.appendChild(makeButton("Pulang - Siang", "pulang-siang", () =>
+          catatJam(nama, STATUS.PULANG_SIANG)
         ));
-        colLeft.appendChild(makeButton("Absent Pagi", "absent", () =>
+        col1.appendChild(makeButton("Absent Pagi", "absent", () =>
           setAbsent(nama, "pagi")
         ));
 
-        // Kolom kanan
-        const colRight = document.createElement("div");
-        colRight.className = "col";
-        colRight.appendChild(makeButton("Siang Masuk", "siang-masuk", () =>
-          catatJam(nama, STATUS.SIANG_MASUK)
+        // Kolom 2: Masuk-Siang, Pulang-Sore, Absent Siang
+        const col2 = document.createElement("div");
+        col2.className = "col";
+        col2.appendChild(makeButton("Masuk - Siang", "masuk-siang", () =>
+          catatJam(nama, STATUS.MASUK_SIANG)
         ));
-        colRight.appendChild(makeButton("Sore Pulang", "sore-pulang", () =>
-          catatJam(nama, STATUS.SORE_PULANG)
+        col2.appendChild(makeButton("Pulang - Sore", "pulang-sore", () =>
+          catatJam(nama, STATUS.PULANG_SORE)
         ));
-        colRight.appendChild(makeButton("Absent Siang", "absent", () =>
+        col2.appendChild(makeButton("Absent Siang", "absent", () =>
           setAbsent(nama, "siang")
         ));
 
-        btnGroup.appendChild(colLeft);
-        btnGroup.appendChild(colRight);
+        // Kolom 3: Masuk-Sore, Pulang-Malam, Absent Sore
+        const col3 = document.createElement("div");
+        col3.className = "col";
+        col3.appendChild(makeButton("Masuk - Sore", "masuk-sore", () =>
+          catatJam(nama, STATUS.MASUK_SORE)
+        ));
+        col3.appendChild(makeButton("Pulang - Malam", "pulang-malam", () =>
+          catatJam(nama, STATUS.PULANG_MALAM)
+        ));
+        col3.appendChild(makeButton("Absent Sore", "absent", () =>
+          setAbsent(nama, "sore")
+        ));
+
+        btnGroup.appendChild(col1);
+        btnGroup.appendChild(col2);
+        btnGroup.appendChild(col3);
 
         card.appendChild(title);
         card.appendChild(btnGroup);
@@ -236,7 +255,7 @@
       return btn;
     }
 
-    // --- CATAT JAM MASUK/PULANG ---
+    // --- CATAT JAM ---
     function catatJam(namaPegawai, status) {
       if (sudahAdaUntukHariIni(namaPegawai, status)) {
         alert("Tombol ini sudah dipakai hari ini untuk " + namaPegawai);
@@ -261,12 +280,17 @@
       updateAllButtonsDisabledState();
     }
 
-    // --- SET ABSEN PAGI / SIANG ---
-    function setAbsent(namaPegawai, jenis) {
-      const status = (jenis === "pagi") ? STATUS.ABSEN_PAGI : STATUS.ABSEN_SIANG;
+    // --- ABSEN PER SHIFT ---
+    function setAbsent(namaPegawai, shift) {
+      let status;
+      if (shift === "pagi")  status = STATUS.ABSEN_PAGI;
+      if (shift === "siang") status = STATUS.ABSEN_SIANG;
+      if (shift === "sore")  status = STATUS.ABSEN_SORE;
+
+      if (!status) return;
 
       if (sudahAdaUntukHariIni(namaPegawai, status)) {
-        alert("Absent " + jenis + " sudah dicatat hari ini untuk " + namaPegawai);
+        alert("Absent " + shift + " sudah dicatat hari ini untuk " + namaPegawai);
         return;
       }
 
@@ -288,7 +312,7 @@
       updateAllButtonsDisabledState();
     }
 
-    // --- DISABLE TOMBOL SESUAI DATA (JAM & ABSEN) ---
+    // --- DISABLE TOMBOL (JAM & ABSEN) ---
     function updateAllButtonsDisabledState() {
       const now = getNow();
       const data = loadData();
@@ -300,10 +324,12 @@
 
       const absenPagiSet  = new Set();
       const absenSiangSet = new Set();
+      const absenSoreSet  = new Set();
 
       listHariIni.forEach(rec => {
         if (rec.status === STATUS.ABSEN_PAGI)  absenPagiSet.add(rec.nama);
         if (rec.status === STATUS.ABSEN_SIANG) absenSiangSet.add(rec.nama);
+        if (rec.status === STATUS.ABSEN_SORE)  absenSoreSet.add(rec.nama);
       });
 
       const cards = document.querySelectorAll(".card");
@@ -317,21 +343,28 @@
           let status = null;
           let forceDisable = false;
 
-          if (label === "Pagi Masuk")   status = STATUS.PAGI_MASUK;
-          if (label === "Siang Pulang") status = STATUS.SIANG_PULANG;
-          if (label === "Siang Masuk")  status = STATUS.SIANG_MASUK;
-          if (label === "Sore Pulang")  status = STATUS.SORE_PULANG;
-          if (label === "Absent Pagi")  status = STATUS.ABSEN_PAGI;
-          if (label === "Absent Siang") status = STATUS.ABSEN_SIANG;
+          if (label === "Masuk - Pagi")    status = STATUS.MASUK_PAGI;
+          if (label === "Pulang - Siang")  status = STATUS.PULANG_SIANG;
+          if (label === "Masuk - Siang")   status = STATUS.MASUK_SIANG;
+          if (label === "Pulang - Sore")   status = STATUS.PULANG_SORE;
+          if (label === "Masuk - Sore")    status = STATUS.MASUK_SORE;
+          if (label === "Pulang - Malam")  status = STATUS.PULANG_MALAM;
+          if (label === "Absent Pagi")     status = STATUS.ABSEN_PAGI;
+          if (label === "Absent Siang")    status = STATUS.ABSEN_SIANG;
+          if (label === "Absent Sore")     status = STATUS.ABSEN_SORE;
 
           if (!status || !nama) return;
 
           if (absenPagiSet.has(nama) &&
-              (status === STATUS.PAGI_MASUK || status === STATUS.SIANG_PULANG)) {
+              (status === STATUS.MASUK_PAGI || status === STATUS.PULANG_SIANG)) {
             forceDisable = true;
           }
           if (absenSiangSet.has(nama) &&
-              (status === STATUS.SIANG_MASUK || status === STATUS.SORE_PULANG)) {
+              (status === STATUS.MASUK_SIANG || status === STATUS.PULANG_SORE)) {
+            forceDisable = true;
+          }
+          if (absenSoreSet.has(nama) &&
+              (status === STATUS.MASUK_SORE || status === STATUS.PULANG_MALAM)) {
             forceDisable = true;
           }
 
@@ -349,7 +382,7 @@
       });
     }
 
-    // --- EXPORT CSV DENGAN OVERTIME & ABSEN, URUT NAMA → TANGGAL ---
+    // --- EXPORT CSV: OVERTIME TOTAL (PAGI+SIANG+SORE) ---
     function downloadCsv() {
       const data = loadData();
       const dates = Object.keys(data).sort();
@@ -368,28 +401,29 @@
               tanggal: rec.tanggal,
               hari: rec.hari || "",
               nama: rec.nama,
-              "Pagi-Masuk": "",
-              "Siang-Pulang": "",
-              "Siang-Masuk": "",
-              "Sore-Pulang": "",
+              [STATUS.MASUK_PAGI]:   "",
+              [STATUS.PULANG_SIANG]: "",
+              [STATUS.MASUK_SIANG]:  "",
+              [STATUS.PULANG_SORE]:  "",
+              [STATUS.MASUK_SORE]:   "",
+              [STATUS.PULANG_MALAM]: "",
               absenPagi: false,
-              absenSiang: false
+              absenSiang: false,
+              absenSore: false
             };
           }
 
           const bucket = perHariPerNama[key];
 
-          if (rec.status === STATUS.ABSEN_PAGI) {
-            bucket.absenPagi = true;
-          } else if (rec.status === STATUS.ABSEN_SIANG) {
-            bucket.absenSiang = true;
-          } else if (bucket[rec.status] === "") {
+          if (rec.status === STATUS.ABSEN_PAGI)      bucket.absenPagi  = true;
+          else if (rec.status === STATUS.ABSEN_SIANG) bucket.absenSiang = true;
+          else if (rec.status === STATUS.ABSEN_SORE)  bucket.absenSore  = true;
+          else if (bucket[rec.status] === "") {
             bucket[rec.status] = rec.jam;
           }
         });
       });
 
-      // Urut: Nama dulu, lalu tanggal naik
       const keys = Object.keys(perHariPerNama).sort((a, b) => {
         const [tglA, namaA] = a.split("|");
         const [tglB, namaB] = b.split("|");
@@ -400,7 +434,9 @@
       const rows = [];
       rows.push([
         "Nama", "Hari", "Tanggal",
-        "Pagi-Masuk", "Siang-Pulang", "Siang-Masuk", "Sore-Pulang",
+        "Masuk-Pagi", "Pulang-Siang",
+        "Masuk-Siang", "Pulang-Sore",
+        "Masuk-Sore", "Pulang-Malam",
         "Overtime"
       ]);
 
@@ -409,38 +445,50 @@
 
         const durasiPagiJam = r.absenPagi
           ? 0
-          : hitungDurasiJam(r["Pagi-Masuk"], r["Siang-Pulang"]);
+          : hitungDurasiJam(r[STATUS.MASUK_PAGI], r[STATUS.PULANG_SIANG]);
 
-        const durasiSoreJam = r.absenSiang
+        const durasiSiangJam = r.absenSiang
           ? 0
-          : hitungDurasiJam(r["Siang-Masuk"], r["Sore-Pulang"]);
+          : hitungDurasiJam(r[STATUS.MASUK_SIANG], r[STATUS.PULANG_SORE]);
 
-        const totalJam = durasiPagiJam + durasiSoreJam;
+        const durasiSoreJam = r.absenSore
+          ? 0
+          : hitungDurasiJam(r[STATUS.MASUK_SORE], r[STATUS.PULANG_MALAM]);
+
+        const totalJam = durasiPagiJam + durasiSiangJam + durasiSoreJam;
         const overtimeJam = totalJam > 8 ? totalJam - 8 : 0;
         const overtimeText = overtimeJam > 0 ? formatJamDesimal(overtimeJam) + " jam" : "";
 
-        let pagiMasukCell   = r["Pagi-Masuk"];
-        let siangPulangCell = r["Siang-Pulang"];
-        let siangMasukCell  = r["Siang-Masuk"];
-        let sorePulangCell  = r["Sore-Pulang"];
+        let masukPagi   = r[STATUS.MASUK_PAGI];
+        let pulangSiang = r[STATUS.PULANG_SIANG];
+        let masukSiang  = r[STATUS.MASUK_SIANG];
+        let pulangSore  = r[STATUS.PULANG_SORE];
+        let masukSore   = r[STATUS.MASUK_SORE];
+        let pulangMalam = r[STATUS.PULANG_MALAM];
 
         if (r.absenPagi) {
-          pagiMasukCell   = "[ABSEN]";
-          siangPulangCell = "[ABSEN]";
+          masukPagi   = "[ABSEN]";
+          pulangSiang = "[ABSEN]";
         }
         if (r.absenSiang) {
-          siangMasukCell  = "[ABSEN]";
-          sorePulangCell  = "[ABSEN]";
+          masukSiang  = "[ABSEN]";
+          pulangSore  = "[ABSEN]";
+        }
+        if (r.absenSore) {
+          masukSore   = "[ABSEN]";
+          pulangMalam = "[ABSEN]";
         }
 
         rows.push([
           r.nama,
           r.hari,
           formatTanggalIndo(r.tanggal),
-          pagiMasukCell,
-          siangPulangCell,
-          siangMasukCell,
-          sorePulangCell,
+          masukPagi,
+          pulangSiang,
+          masukSiang,
+          pulangSore,
+          masukSore,
+          pulangMalam,
           overtimeText
         ]);
       });
