@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Absensi Pegawai Toko</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    }
+    .nama {
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    button {
+      flex: 1 1 45%;
+      padding: 8px;
+      font-size: 14px;
+      border-radius: 6px;
+      border: none;
+      color: #fff;
+      cursor: pointer;
+    }
+    .pagi-masuk   { background: #2196f3; }
+    .siang-pulang { background: #ff9800; }
+    .siang-masuk  { background: #4caf50; }
+    .sore-pulang  { background: #9c27b0; }
+    .absent       { background: #e53935; }
+
+    button.disabled-btn {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .footer {
+      margin-top: 16px;
+      font-size: 12px;
+      text-align: center;
+    }
+    .footer button {
+      flex: 0 0 auto;
+      margin: 4px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: #444;
+    }
+    .info-tanggal {
+      text-align: center;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    .log-preview {
+      white-space: pre-wrap;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #222;
+      color: #eee;
+      padding: 8px;
+      border-radius: 6px;
+      margin-top: 8px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <h1>Absensi Pegawai Toko</h1>
+  <div class="info-tanggal" id="infoTanggal"></div>
+
+  <div id="listPegawai"></div>
+
+  <div class="card footer">
+    <div>
+      <button onclick="downloadCsv()">Download Excel (CSV)</button>
+      <button onclick="clearAllData()">Clear All Log</button>
+    </div>
+    <div style="margin-top:6px;">Preview data tersimpan:</div>
+    <div id="logPreview" class="log-preview"></div>
+  </div>
+
+  <script>
+    // --- KONFIGURASI ---
+    const PEGAWAI = [
+      "Bu Wita",
+      "Bu Sur",
+      "Bu Susi",
+      "Dea",
+      "Nurul",
+      "Bg Ari"
+    ];
+
+    const STATUS = {
+      PAGI_MASUK:   "Pagi-Masuk",
+      SIANG_PULANG: "Siang-Pulang",
+      SIANG_MASUK:  "Siang-Masuk",
+      SORE_PULANG:  "Sore-Pulang",
+      ABSEN_PAGI:   "Absent-Pagi",
+      ABSEN_SIANG:  "Absent-Siang"
+    };
+
+    const STORAGE_KEY = "absensi_toko";
+
+    // --- UTIL TANGGAL & WAKTU ---
+    function pad(n) { return n.toString().padStart(2, "0"); }
+
+    function getNow() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = pad(d.getMonth() + 1);
+      const dd = pad(d.getDate());
+      const hh = pad(d.getHours());
+      const min = pad(d.getMinutes());
+      const ss = pad(d.getSeconds());
+
+      const hariIndex = d.getDay();
+      const namaHari = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"][hariIndex];
+
+      return {
+        dateKey: `${yyyy}-${mm}-${dd}`,
+        dateLabel: `${dd}-${mm}-${yyyy}`,
+        time: `${hh}:${min}:${ss}`,
+        dayName: namaHari
+      };
+    }
+
+    function formatTanggalIndo(tanggalYMD) {
+      const [y, m, d] = tanggalYMD.split("-");
+      return `${d}/${m}/${y}`;
+    }
+
+    // --- LOCAL STORAGE ---
+    function loadData() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.error("Data rusak, reset", e);
+        return {};
+      }
+    }
+
+    function saveData(data) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function sudahAdaUntukHariIni(nama, status) {
+      const now = getNow();
+      const data = loadData();
+      const list = data[now.dateKey] || [];
+      return list.some(rec => rec.nama === nama && rec.status === status);
+    }
+
+    // --- RENDER PEGAWAI + TOMBOL ---
+    function renderPegawai() {
+      const container = document.getElementById("listPegawai");
+      container.innerHTML = "";
+
+      PEGAWAI.forEach(nama => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const title = document.createElement("div");
+        title.className = "nama";
+        title.textContent = nama;
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        btnGroup.appendChild(makeButton("Pagi Masuk", "pagi-masuk", () =>
+          catatJam(nama, STATUS.PAGI_MASUK)
+        ));
+        btnGroup.appendChild(makeButton("Siang Pulang", "siang-pulang", () =>
+          catatJam(nama, STATUS.SIANG_PULANG)
+        ));
+        btnGroup.appendChild(makeButton("Siang Masuk", "siang-masuk", () =>
+          catatJam(nama, STATUS.SIANG_MASUK)
+        ));
+        btnGroup.appendChild(makeButton("Sore Pulang", "sore-pulang", () =>
+          catatJam(nama, STATUS.SORE_PULANG)
+        ));
+
+        btnGroup.appendChild(makeButton("Absent Pagi", "absent", () =>
+          setAbsent(nama, "pagi")
+        ));
+        btnGroup.appendChild(makeButton("Absent Siang", "absent", () =>
+          setAbsent(nama, "siang")
+        ));
+
+        card.appendChild(title);
+        card.appendChild(btnGroup);
+        container.appendChild(card);
+      });
+
+      updateAllButtonsDisabledState();
+    }
+
+    function makeButton(label, cssClass, onClick) {
+      const btn = document.createElement("button");
+      btn.textContent = label;
+      btn.classList.add(cssClass);
+      btn.onclick = onClick;
+      return btn;
+    }
+
+    // --- CATAT JAM MASUK/PULANG ---
+    function catatJam(namaPegawai, status) {
+      if (sudahAdaUntukHariIni(namaPegawai, status)) {
+        alert("Tombol ini sudah dipakai hari ini untuk " + namaPegawai);
+        return;
+      }
+
+      const now = getNow();
+      const data = loadData();
+      if (!data[now.dateKey]) data[now.dateKey] = [];
+
+      data[now.dateKey].push({
+        nama: namaPegawai,
+        status: status,
+        tanggal: now.dateKey,
+        hari: now.dayName,
+        jam: now.time
+      });
+
+      saveData(data);
+      alert(`Terekam: ${namaPegawai} - ${status} - ${now.time}`);
+      renderPreview();
+      updateAllButtonsDisabledState();
+    }
+
+    // --- SET ABSEN PAGI / SIANG ---
+    function setAbsent(namaPegawai, jenis) {
+      const status = (jenis === "pagi") ? STATUS.ABSEN_PAGI : STATUS.ABSEN_SIANG;
+
+      if (sudahAdaUntukHariIni(namaPegawai, status)) {
+        alert("Absent " + jenis + " sudah dicatat hari ini untuk " + namaPegawai);
+        return;
+      }
+
+      const now = getNow();
+      const data = loadData();
+      if (!data[now.dateKey]) data[now.dateKey] = [];
+
+      data[now.dateKey].push({
+        nama: namaPegawai,
+        status: status,
+        tanggal: now.dateKey,
+        hari: now.dayName,
+        jam: now.time
+      });
+
+      saveData(data);
+      alert(`Terekam: ${namaPegawai} - ${status} - ${now.time}`);
+      renderPreview();
+      updateAllButtonsDisabledState();
+    }
+
+    // --- DISABLE TOMBOL SESUAI DATA (JAM & ABSEN) ---
+    function updateAllButtonsDisabledState() {
+      const now = getNow();
+      const data = loadData();
+      const listHariIni = data[now.dateKey] || [];
+
+      const usedSet = new Set(
+        listHariIni.map(rec => `${rec.nama}|${rec.status}`)
+      );
+
+      const absenPagiSet  = new Set();
+      const absenSiangSet = new Set();
+
+      listHariIni.forEach(rec => {
+        if (rec.status === STATUS.ABSEN_PAGI)  absenPagiSet.add(rec.nama);
+        if (rec.status === STATUS.ABSEN_SIANG) absenSiangSet.add(rec.nama);
+      });
+
+      const cards = document.querySelectorAll(".card");
+      cards.forEach(card => {
+        const namaEl = card.querySelector(".nama");
+        const nama = namaEl ? namaEl.textContent.trim() : null;
+        const buttons = card.querySelectorAll("button");
+
+        buttons.forEach(btn => {
+          const label = btn.textContent.trim();
+          let status = null;
+          let forceDisable = false;
+
+          if (label === "Pagi Masuk")   status = STATUS.PAGI_MASUK;
+          if (label === "Siang Pulang") status = STATUS.SIANG_PULANG;
+          if (label === "Siang Masuk")  status = STATUS.SIANG_MASUK;
+          if (label === "Sore Pulang")  status = STATUS.SORE_PULANG;
+          if (label === "Absent Pagi")  status = STATUS.ABSEN_PAGI;
+          if (label === "Absent Siang") status = STATUS.ABSEN_SIANG;
+
+          if (!status || !nama) return;
+
+          if (absenPagiSet.has(nama) &&
+              (status === STATUS.PAGI_MASUK || status === STATUS.SIANG_PULANG)) {
+            forceDisable = true;
+          }
+          if (absenSiangSet.has(nama) &&
+              (status === STATUS.SIANG_MASUK || status === STATUS.SORE_PULANG)) {
+            forceDisable = true;
+          }
+
+          const key = `${nama}|${status}`;
+          const sudahKlikStatusIni = usedSet.has(key);
+
+          if (sudahKlikStatusIni || forceDisable) {
+            btn.disabled = true;
+            btn.classList.add("disabled-btn");
+          } else {
+            btn.disabled = false;
+            btn.classList.remove("disabled-btn");
+          }
+        });
+      });
+    }
+
+    // --- CLEAR ALL DATA (HAPUS LOG + RESET PREVIEW & TOMBOL) ---
+    function clearAllData() {
+      if (!confirm("Yakin ingin menghapus semua data absensi di perangkat ini?")) {
+        return;
+      }
+      localStorage.removeItem(STORAGE_KEY);
+      renderPreview();             // Preview jadi "Belum ada data."
+      updateAllButtonsDisabledState(); // Semua tombol aktif lagi
+    }
+
+    // --- EXPORT CSV DENGAN OVERTIME & ABSEN, URUT NAMA → TANGGAL ---
+    function downloadCsv() {
+      const data = loadData();
+      const dates = Object.keys(data).sort();
+      if (dates.length === 0) {
+        alert("Belum ada data untuk di-download.");
+        return;
+      }
+
+      const perHariPerNama = {};
+
+      dates.forEach(tgl => {
+        data[tgl].forEach(rec => {
+          const key = `${rec.tanggal}|${rec.nama}`;
+          if (!perHariPerNama[key]) {
+            perHariPerNama[key] = {
+              tanggal: rec.tanggal,
+              hari: rec.hari || "",
+              nama: rec.nama,
+              "Pagi-Masuk": "",
+              "Siang-Pulang": "",
+              "Siang-Masuk": "",
+              "Sore-Pulang": "",
+              absenPagi: false,
+              absenSiang: false
+            };
+          }
+
+          const bucket = perHariPerNama[key];
+
+          if (rec.status === STATUS.ABSEN_PAGI) {
+            bucket.absenPagi = true;
+          } else if (rec.status === STATUS.ABSEN_SIANG) {
+            bucket.absenSiang = true;
+          } else if (bucket[rec.status] === "") {
+            bucket[rec.status] = rec.jam;
+          }
+        });
+      });
+
+      const keys = Object.keys(perHariPerNama).sort((a, b) => {
+        const [tglA, namaA] = a.split("|");
+        const [tglB, namaB] = b.split("|");
+        if (namaA === namaB) return tglA.localeCompare(tglB);
+        return namaA.localeCompare(namaB);
+      });
+
+      const rows = [];
+      rows.push([
+        "Nama", "Hari", "Tanggal",
+        "Pagi-Masuk", "Siang-Pulang", "Siang-Masuk", "Sore-Pulang",
+        "Overtime"
+      ]);
+
+      keys.forEach(k => {
+        const r = perHariPerNama[k];
+
+        const durasiPagiJam = r.absenPagi
+          ? 0
+          : hitungDurasiJam(r["Pagi-Masuk"], r["Siang-Pulang"]);
+
+        const durasiSoreJam = r.absenSiang
+          ? 0
+          : hitungDurasiJam(r["Siang-Masuk"], r["Sore-Pulang"]);
+
+        const totalJam = durasiPagiJam + durasiSoreJam;
+        const overtimeJam = totalJam > 8 ? totalJam - 8 : 0;
+        const overtimeText = overtimeJam > 0 ? formatJamDesimal(overtimeJam) + " jam" : "";
+
+        let pagiMasukCell   = r["Pagi-Masuk"];
+        let siangPulangCell = r["Siang-Pulang"];
+        let siangMasukCell  = r["Siang-Masuk"];
+        let sorePulangCell  = r["Sore-Pulang"];
+
+        if (r.absenPagi) {
+          pagiMasukCell   = "[ABSEN]";
+          siangPulangCell = "[ABSEN]";
+        }
+        if (r.absenSiang) {
+          siangMasukCell  = "[ABSEN]";
+          sorePulangCell  = "[ABSEN]";
+        }
+
+        rows.push([
+          r.nama,
+          r.hari,
+          formatTanggalIndo(r.tanggal),
+          pagiMasukCell,
+          siangPulangCell,
+          siangMasukCell,
+          sorePulangCell,
+          overtimeText
+        ]);
+      });
+
+      const csv = rows
+        .map(row =>
+          row
+            .map(col => {
+              const v = String(col ?? "").replace(/"/g, '""');
+              return `"${v}"`;
+            })
+            .join(",")
+        )
+        .join("\n");
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const a = document.createElement("a");
+      const now = getNow();
+      a.href = URL.createObjectURL(blob);
+      a.download = `absensi_${now.dateKey}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // --- FUNGSI WAKTU & OVERTIME ---
+    function hitungDurasiJam(jamMulai, jamSelesai) {
+      if (!jamMulai || !jamSelesai) return 0;
+      const menitMulai = parseJamKeMenit(jamMulai);
+      const menitSelesai = parseJamKeMenit(jamSelesai);
+      if (menitSelesai <= menitMulai) return 0;
+      const durasiMenit = menitSelesai - menitMulai;
+      return durasiMenit / 60;
+    }
+
+    function parseJamKeMenit(jamStr) {
+      const parts = jamStr.split(":");
+      const h = parseInt(parts[0] || "0", 10);
+      const m = parseInt(parts[1] || "0", 10);
+      return h * 60 + m;
+    }
+
+    function formatJamDesimal(jam) {
+      const rounded = Math.round(jam * 100) / 100;
+      return String(rounded).replace(".", ",");
+    }
+
+    // --- PREVIEW ---
+    function renderPreview() {
+      const box = document.getElementById("logPreview");
+      const data = loadData();
+      let text = "";
+
+      const dates = Object.keys(data).sort();
+      if (dates.length === 0) {
+        box.textContent = "Belum ada data.";
+        return;
+      }
+
+      dates.forEach(tgl => {
+        text += `Tanggal: ${tgl}\n`;
+        data[tgl].forEach(rec => {
+          const hari = rec.hari ? ` (${rec.hari})` : "";
+          text += `  - ${rec.nama}${hari} | ${rec.status} | ${rec.jam}\n`;
+        });
+        text += "\n";
+      });
+
+      box.textContent = text;
+    }
+
+    function initTanggal() {
+      const info = document.getElementById("infoTanggal");
+      const now = getNow();
+      info.textContent = `Hari ini: ${now.dayName}, ${now.dateLabel}`;
+    }
+
+    // --- INIT ---
+    initTanggal();
+    renderPegawai();
+    renderPreview();
+  </script>
+</body>
+</html>
